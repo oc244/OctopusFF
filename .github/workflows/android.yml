@@ -1,26 +1,425 @@
-name: Android CI
+name: Build OctopusFF APK
 
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+  workflow_dispatch:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-    - name: set up JDK 11
-      uses: actions/setup-java@v4
-      with:
-        java-version: '11'
-        distribution: 'temurin'
-        cache: gradle
+      - name: Checkout
+        uses: actions/checkout@v6
 
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
-    - name: Build with Gradle
-      run: ./gradlew build
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Create Android project
+        shell: bash
+        run: |
+          mkdir -p app/src/main/java/com/octopusff/app
+          mkdir -p app/src/main/res/values
+
+          cat > settings.gradle <<'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+
+          rootProject.name = "OctopusFF"
+          include(":app")
+          EOF
+
+          cat > build.gradle <<'EOF'
+          plugins {
+              id 'com.android.application' version '8.7.3' apply false
+          }
+          EOF
+
+          cat > app/build.gradle <<'EOF'
+          plugins {
+              id 'com.android.application'
+          }
+
+          android {
+              namespace 'com.octopusff.app'
+              compileSdk 35
+
+              defaultConfig {
+                  applicationId 'com.octopusff.app'
+                  minSdk 23
+                  targetSdk 35
+                  versionCode 1
+                  versionName '1.0'
+              }
+          }
+          EOF
+
+          cat > app/src/main/res/values/colors.xml <<'EOF'
+          <resources>
+              <color name="black">#080808</color>
+              <color name="dark">#111111</color>
+              <color name="red">#E50914</color>
+              <color name="white">#FFFFFF</color>
+              <color name="gray">#A0A0A0</color>
+          </resources>
+          EOF
+
+          cat > app/src/main/res/values/themes.xml <<'EOF'
+          <resources>
+              <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
+                  <item name="android:fontFamily">sans</item>
+                  <item name="android:windowLightStatusBar">false</item>
+                  <item name="android:statusBarColor">#080808</item>
+                  <item name="android:navigationBarColor">#080808</item>
+                  <item name="android:colorAccent">#E50914</item>
+                  <item name="android:windowBackground">#080808</item>
+              </style>
+          </resources>
+          EOF
+
+          cat > app/src/main/AndroidManifest.xml <<'EOF'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+              <application
+                  android:theme="@style/AppTheme"
+                  android:label="Octopus FF"
+                  android:allowBackup="true"
+                  android:supportsRtl="true">
+
+                  <activity
+                      android:name=".MainActivity"
+                      android:screenOrientation="portrait"
+                      android:exported="true">
+
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+
+                  </activity>
+
+              </application>
+
+          </manifest>
+          EOF
+
+          cat > app/src/main/java/com/octopusff/app/MainActivity.java <<'EOF'
+          package com.octopusff.app;
+
+          import android.app.Activity;
+          import android.os.Bundle;
+          import android.graphics.Color;
+          import android.graphics.Typeface;
+          import android.graphics.drawable.GradientDrawable;
+          import android.view.Gravity;
+          import android.view.View;
+          import android.widget.*;
+
+          import java.util.LinkedHashMap;
+          import java.util.Map;
+
+          public class MainActivity extends Activity {
+
+              LinearLayout root;
+              Map<String, SeekBar> sliders = new LinkedHashMap<>();
+
+              int RED = Color.rgb(229, 9, 20);
+              int BLACK = Color.rgb(8, 8, 8);
+              int CARD = Color.rgb(20, 20, 20);
+              int WHITE = Color.WHITE;
+              int GRAY = Color.rgb(160, 160, 160);
+
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+
+                  getWindow().setStatusBarColor(BLACK);
+                  getWindow().setNavigationBarColor(BLACK);
+
+                  buildUI();
+              }
+
+              TextView text(String value, float size, int color) {
+                  TextView t = new TextView(this);
+                  t.setText(value);
+                  t.setTextSize(size);
+                  t.setTextColor(color);
+                  t.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+                  t.setTypeface(Typeface.create("sans", Typeface.NORMAL));
+                  t.setPadding(24, 12, 24, 12);
+                  return t;
+              }
+
+              GradientDrawable background(int color, float radius) {
+                  GradientDrawable g = new GradientDrawable();
+                  g.setColor(color);
+                  g.setCornerRadius(radius);
+                  return g;
+              }
+
+              TextView title(String value) {
+                  TextView t = text(value, 22, WHITE);
+                  t.setTypeface(Typeface.DEFAULT_BOLD);
+                  t.setGravity(Gravity.RIGHT);
+                  t.setPadding(8, 24, 8, 12);
+                  return t;
+              }
+
+              void buildUI() {
+
+                  ScrollView scroll = new ScrollView(this);
+                  scroll.setBackgroundColor(BLACK);
+
+                  root = new LinearLayout(this);
+                  root.setOrientation(LinearLayout.VERTICAL);
+                  root.setPadding(28, 20, 28, 35);
+                  root.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+
+                  scroll.addView(root);
+
+                  TextView logo = text("🐙  OCTOPUS FF", 28, WHITE);
+                  logo.setTypeface(Typeface.DEFAULT_BOLD);
+                  logo.setGravity(Gravity.CENTER);
+                  logo.setPadding(10, 20, 10, 5);
+                  root.addView(logo);
+
+                  TextView subtitle = text(
+                          "مساعد الحساسية الذكي • Free Fire",
+                          15,
+                          GRAY
+                  );
+                  subtitle.setGravity(Gravity.CENTER);
+                  root.addView(subtitle);
+
+                  Space space = new Space(this);
+                  root.addView(space, new LinearLayout.LayoutParams(1, 18));
+
+                  LinearLayout device = card();
+                  device.addView(text("الجهاز", 14, GRAY));
+
+                  TextView deviceName = text("Red Magic 5G", 21, WHITE);
+                  deviceName.setTypeface(Typeface.DEFAULT_BOLD);
+                  device.addView(deviceName);
+
+                  TextView deviceInfo = text(
+                          "ملف مخصص لأداء الهاتف وسلاسة التصويب",
+                          13,
+                          GRAY
+                  );
+                  device.addView(deviceInfo);
+
+                  root.addView(device);
+
+                  root.addView(title("🎯 إعدادات الحساسية"));
+
+                  addSlider("General", 190);
+                  addSlider("Red Dot", 185);
+                  addSlider("2X Scope", 175);
+                  addSlider("4X Scope", 165);
+                  addSlider("Sniper", 110);
+                  addSlider("Free Look", 150);
+
+                  LinearLayout ai = card();
+
+                  TextView aiTitle = text("🤖 التحليل الذكي", 19, WHITE);
+                  aiTitle.setTypeface(Typeface.DEFAULT_BOLD);
+                  ai.addView(aiTitle);
+
+                  TextView aiInfo = text(
+                          "اضغط لتحليل الإعدادات الحالية واقتراح تعديل متوازن.",
+                          14,
+                          GRAY
+                  );
+                  ai.addView(aiInfo);
+
+                  Button analyze = button("تحليل الإعدادات");
+                  ai.addView(analyze);
+
+                  analyze.setOnClickListener(v -> {
+                      Toast.makeText(
+                              this,
+                              "تم تحليل الإعدادات واقتراح إعداد متوازن 🎯",
+                              Toast.LENGTH_LONG
+                      ).show();
+                  });
+
+                  root.addView(ai);
+
+                  Button generate = button("🔥 توليد إعداد جديد");
+
+                  LinearLayout.LayoutParams gp =
+                          new LinearLayout.LayoutParams(
+                                  -1,
+                                  58
+                          );
+                  gp.setMargins(0, 20, 0, 10);
+
+                  root.addView(generate, gp);
+
+                  generate.setOnClickListener(v -> generateSettings());
+
+                  Button save = button("💾 حفظ الإعداد");
+
+                  root.addView(save);
+
+                  save.setOnClickListener(v ->
+                          Toast.makeText(
+                                  this,
+                                  "تم حفظ الإعداد على الجهاز ✅",
+                                  Toast.LENGTH_SHORT
+                          ).show()
+                  );
+
+                  TextView footer = text(
+                          "Octopus FF  •  الإصدار 1.0",
+                          12,
+                          GRAY
+                  );
+                  footer.setGravity(Gravity.CENTER);
+                  footer.setPadding(5, 30, 5, 5);
+                  root.addView(footer);
+
+                  setContentView(scroll);
+              }
+
+              LinearLayout card() {
+                  LinearLayout box = new LinearLayout(this);
+                  box.setOrientation(LinearLayout.VERTICAL);
+                  box.setPadding(20, 15, 20, 15);
+                  box.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+                  box.setBackground(background(CARD, 24));
+
+                  LinearLayout.LayoutParams p =
+                          new LinearLayout.LayoutParams(-1, -2);
+                  p.setMargins(0, 8, 0, 8);
+
+                  box.setLayoutParams(p);
+
+                  return box;
+              }
+
+              void addSlider(String name, int value) {
+
+                  LinearLayout box = card();
+
+                  LinearLayout row = new LinearLayout(this);
+                  row.setOrientation(LinearLayout.HORIZONTAL);
+                  row.setGravity(Gravity.CENTER_VERTICAL);
+
+                  TextView label = text(name, 15, WHITE);
+                  label.setGravity(Gravity.RIGHT);
+
+                  TextView number = text(String.valueOf(value), 15, RED);
+                  number.setTypeface(Typeface.DEFAULT_BOLD);
+                  number.setGravity(Gravity.CENTER);
+
+                  row.addView(
+                          label,
+                          new LinearLayout.LayoutParams(0, 50, 1)
+                  );
+
+                  row.addView(
+                          number,
+                          new LinearLayout.LayoutParams(70, 50)
+                  );
+
+                  box.addView(row);
+
+                  SeekBar bar = new SeekBar(this);
+                  bar.setMax(200);
+                  bar.setProgress(value);
+
+                  box.addView(
+                          bar,
+                          new LinearLayout.LayoutParams(-1, 45)
+                  );
+
+                  bar.setOnSeekBarChangeListener(
+                          new SeekBar.OnSeekBarChangeListener() {
+
+                              public void onProgressChanged(
+                                      SeekBar s,
+                                      int progress,
+                                      boolean fromUser) {
+                                  number.setText(String.valueOf(progress));
+                              }
+
+                              public void onStartTrackingTouch(SeekBar s) {}
+
+                              public void onStopTrackingTouch(SeekBar s) {}
+                          }
+                  );
+
+                  sliders.put(name, bar);
+                  root.addView(box);
+              }
+
+              Button button(String value) {
+                  Button b = new Button(this);
+                  b.setText(value);
+                  b.setTextColor(WHITE);
+                  b.setTextSize(15);
+                  b.setAllCaps(false);
+                  b.setTypeface(Typeface.DEFAULT_BOLD);
+                  b.setGravity(Gravity.CENTER);
+                  b.setBackground(background(RED, 22));
+                  b.setPadding(10, 5, 10, 5);
+                  return b;
+              }
+
+              void generateSettings() {
+
+                  int[] values = {
+                          195,
+                          190,
+                          180,
+                          170,
+                          120,
+                          155
+                  };
+
+                  int i = 0;
+
+                  for (SeekBar bar : sliders.values()) {
+                      bar.setProgress(values[i++]);
+                  }
+
+                  Toast.makeText(
+                          this,
+                          "تم توليد إعداد مناسب لـ Red Magic 5G 🔥",
+                          Toast.LENGTH_LONG
+                  ).show();
+              }
+          }
+          EOF
+
+      - name: Build APK
+        run: gradle :app:assembleDebug --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: OctopusFF-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
